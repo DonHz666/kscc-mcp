@@ -3,6 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { runSchema, handleRun } from "./tools/run.js";
 import { continueSchema, handleContinue } from "./tools/continue.js";
+import { killActiveChildren } from "./kscc/invoke.js";
 
 function testHooksFromEnv(): { _ksccBin?: string; _prependArgv?: string[]; _env?: NodeJS.ProcessEnv } {
   const bin = process.env.KSCC_MCP_TEST_BIN;
@@ -35,6 +36,17 @@ async function main(): Promise<void> {
   const transport = new StdioServerTransport();
   const server = createServer();
   await server.connect(transport);
+  // 客户端断开 stdio（stdin 关闭/EOF）时，MCP SDK 的 transport.close() 只清理
+  // 监听器不退出进程。这里兜底：stdin 关闭时 kill 所有活跃 kscc 子进程（避免
+  // 孤儿）并退出，防止 server 进程在客户端断开后残留。
+  process.stdin.on("end", () => {
+    killActiveChildren();
+    process.exit(0);
+  });
+  process.stdin.on("close", () => {
+    killActiveChildren();
+    process.exit(0);
+  });
 }
 
 const isMain = (() => {

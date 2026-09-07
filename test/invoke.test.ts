@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { invokeKscc, quoteWindowsArg } from "../src/kscc/invoke.js";
+import { invokeKscc, quoteWindowsArg, resolveBinToExe } from "../src/kscc/invoke.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fakeKscc = process.platform === "win32"
@@ -70,8 +70,7 @@ describe("invokeKscc", () => {
 
   it("命令名 bin 含空格的 arg 不被截断", async () => {
     // 回归（真实 bug）：shell:true 曾让 cmd.exe 按空格截断含空格的参数。
-    // 修法改为 cmd.exe /c + 手动引号 + windowsVerbatimArguments。
-    // 用 "node" 命令名 + -e 输出含空格的字符串，验证空格保留。
+    // 现改为 resolveBinToExe 直 spawn .exe（不经 shell），空格天然安全。
     const spaced = "hello world with spaces";
     const out = await invokeKscc({
       argv: ["-e", `process.stdout.write(${JSON.stringify(spaced)})`],
@@ -82,6 +81,52 @@ describe("invokeKscc", () => {
     });
     expect(out.exitCode).toBe(0);
     expect(out.stdout).toContain(spaced);
+  });
+
+  it("命令名 bin 含反斜杠的 arg 不被破坏", async () => {
+    // 回归（真实 bug）：cmd.exe /c 路径会破坏 prompt 里的反斜杠。
+    // resolveBinToExe 直 spawn .exe 不经 shell，反斜杠安全。
+    const backslash = "path\\with\\backslash";
+    const out = await invokeKscc({
+      argv: ["-e", `process.stdout.write(${JSON.stringify(backslash)})`],
+      cwd: here,
+      timeoutMs: 10000,
+      ksccBin: "node",
+      env: { ...process.env },
+    });
+    expect(out.exitCode).toBe(0);
+    expect(out.stdout).toContain(backslash);
+  });
+
+  it("命令名 bin 含换行的 arg 不被破坏", async () => {
+    // 回归（真实 bug）：cmd.exe /c 路径会破坏 prompt 里的换行符。
+    const newline = "line1\nline2";
+    const out = await invokeKscc({
+      argv: ["-e", `process.stdout.write(${JSON.stringify(newline)})`],
+      cwd: here,
+      timeoutMs: 10000,
+      ksccBin: "node",
+      env: { ...process.env },
+    });
+    expect(out.exitCode).toBe(0);
+    expect(out.stdout).toContain(newline);
+  });
+});
+
+describe("resolveBinToExe", () => {
+  it("node 命令名能解析到 node.exe 绝对路径", () => {
+    if (process.platform !== "win32") return; // Windows 专属
+    const exe = resolveBinToExe("node", process.env);
+    expect(exe).toBeTruthy();
+    expect(exe!.toLowerCase()).toMatch(/node\.exe$/);
+  });
+  it("返回正斜杠路径", () => {
+    if (process.platform !== "win32") return;
+    const exe = resolveBinToExe("node", process.env);
+    if (exe) expect(exe).not.toContain("\\");
+  });
+  it("不存在的命令返回 null", () => {
+    expect(resolveBinToExe("no-such-bin-xyz", process.env)).toBeNull();
   });
 });
 

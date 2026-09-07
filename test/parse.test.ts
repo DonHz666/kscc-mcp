@@ -47,4 +47,25 @@ describe("parseKsccResult", () => {
     expect(r.text).toBe('{"looks":"like json"}');
     expect(r.is_error).toBe(false);
   });
+
+  it("空 stdout 返回空 text 而非抛错", () => {
+    const r = parseKsccResult("");
+    expect(r.text).toBe("");
+    expect(r.is_error).toBe(false);
+    expect(r.session_id).toBe(null);
+  });
+
+  it("纯空白 stdout 返回空 text", () => {
+    const r = parseKsccResult("   \n  ");
+    expect(r.text).toBe("");
+    expect(r.is_error).toBe(false);
+  });
+
+  it("strip UTF-8 BOM 后正常解析", () => {
+    const bom = "﻿" + '{"type":"result","result":"bom-test","is_error":false,"session_id":"s-bom"}';
+    const r = parseKsccResult(bom);
+    expect(r.text).toBe("bom-test");
+    expect(r.is_error).toBe(false);
+    expect(r.session_id).toBe("s-bom");
+  });
 });

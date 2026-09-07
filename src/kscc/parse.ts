@@ -30,11 +30,25 @@ export function parseKsccResult(stdout: string, rawText = false): RunResult {
       is_error: false,
     };
   }
+  // 健壮性：strip UTF-8 BOM（部分环境输出带 BOM 会让 JSON.parse 失败）
+  const cleaned = stdout.charCodeAt(0) === 0xfeff ? stdout.slice(1) : stdout;
+  // 空输出：kscc 退出码 0 但无输出，返回空 text 而非抛错（边界友好）
+  if (cleaned.trim() === "") {
+    return {
+      session_id: null,
+      text: "",
+      tool_uses: [],
+      cost_usd: null,
+      duration_ms: null,
+      num_turns: null,
+      is_error: false,
+    };
+  }
   let parsed: KsccJson;
   try {
-    parsed = JSON.parse(stdout);
+    parsed = JSON.parse(cleaned);
   } catch {
-    throw new Error(`kscc 输出非 JSON: ${stdout.slice(0, 200)}`);
+    throw new Error(`kscc 输出非 JSON: ${cleaned.slice(0, 200)}`);
   }
   return {
     session_id: parsed.session_id ?? null,
