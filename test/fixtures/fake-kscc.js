@@ -9,7 +9,7 @@ if (mode === "slow") {
   setTimeout(() => {
     process.stdout.write('{"type":"result","result":"late","is_error":false,"session_id":null,"total_cost_usd":0,"duration_ms":0,"num_turns":1}');
     process.exit(0);
-  }, 5000);
+  }, 30000); // 30s > test timeoutMs(10s), 确保触发超时
   process.exit;
 } else {
   process.stdout.write('{"type":"result","result":"pong","is_error":false,"session_id":"s-1","total_cost_usd":0.1,"duration_ms":10,"num_turns":1}');
