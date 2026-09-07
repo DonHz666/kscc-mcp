@@ -1,0 +1,56 @@
+import { spawn } from "node:child_process";
+import { DEFAULTS } from "../config.js";
+
+export interface InvokeOptions {
+  argv: string[];
+  cwd: string;
+  timeoutMs?: number;
+  env?: NodeJS.ProcessEnv;
+  ksccBin?: string;
+}
+
+export interface InvokeOutput {
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  timedOut: boolean;
+}
+
+export function invokeKscc(opts: InvokeOptions): Promise<InvokeOutput> {
+  const bin = opts.ksccBin ?? "kscc";
+  const timeoutMs = opts.timeoutMs ?? DEFAULTS.timeoutMs;
+  return new Promise((resolve) => {
+    const child = spawn(bin, opts.argv, {
+      cwd: opts.cwd,
+      env: opts.env ?? process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    });
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
+    let timer: NodeJS.Timeout | undefined = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGKILL");
+    }, timeoutMs);
+
+    child.stdout?.setEncoding("utf8");
+    child.stderr?.setEncoding("utf8");
+    child.stdout?.on("data", (d: string) => { stdout += d; });
+    child.stderr?.on("data", (d: string) => { stderr += d; });
+
+    child.on("error", (err) => {
+      if (timer) clearTimeout(timer);
+      resolve({
+        stdout,
+        stderr: stderr + `\nspawn error: ${err.message}`,
+        exitCode: null,
+        timedOut: false,
+      });
+    });
+    child.on("close", (code) => {
+      if (timer) clearTimeout(timer);
+      resolve({ stdout, stderr, exitCode: code, timedOut });
+    });
+  });
+}
