@@ -17,7 +17,19 @@ interface KsccJson {
   is_error?: boolean;
 }
 
-export function parseKsccResult(stdout: string): RunResult {
+export function parseKsccResult(stdout: string, rawText = false): RunResult {
+  // rawText=true（outputFormat=text）：kscc 输出纯文本，直接当 text 返回，不解析 JSON。
+  if (rawText) {
+    return {
+      session_id: null,
+      text: stdout,
+      tool_uses: [],
+      cost_usd: null,
+      duration_ms: null,
+      num_turns: null,
+      is_error: false,
+    };
+  }
   let parsed: KsccJson;
   try {
     parsed = JSON.parse(stdout);

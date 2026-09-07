@@ -61,7 +61,7 @@ export async function handleRun(args: RunToolArgs & TestHooks): Promise<ToolResu
     });
     if (out.timedOut) return errResult(`kscc 超时（${timeoutMs ?? DEFAULTS.timeoutMs} ms）`);
     if (out.exitCode !== 0) return errResult(`kscc 退出码 ${out.exitCode}: ${out.stderr.trim()}`);
-    const result = parseKsccResult(out.stdout);
+    const result = parseKsccResult(out.stdout, rest.outputFormat === "text");
     return { content: [{ type: "text", text: JSON.stringify(result) }], isError: result.is_error ? true : undefined };
   } catch (e) {
     return errResult((e as Error).message);

@@ -32,4 +32,19 @@ describe("parseKsccResult", () => {
   it("非 JSON 抛错", () => {
     expect(() => parseKsccResult("not json at all")).toThrow();
   });
+
+  it("rawText=true 时纯文本当 text 返回，不解析 JSON", () => {
+    const r = parseKsccResult("纯文本测试", true);
+    expect(r.text).toBe("纯文本测试");
+    expect(r.is_error).toBe(false);
+    expect(r.session_id).toBe(null);
+    expect(r.tool_uses).toEqual([]);
+    expect(r.cost_usd).toBe(null);
+  });
+
+  it("rawText=true 时不影响 JSON 字符串内容（原样保留）", () => {
+    const r = parseKsccResult('{"looks":"like json"}', true);
+    expect(r.text).toBe('{"looks":"like json"}');
+    expect(r.is_error).toBe(false);
+  });
 });
