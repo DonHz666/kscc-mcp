@@ -25,6 +25,11 @@ export function invokeKscc(opts: InvokeOptions): Promise<InvokeOutput> {
       env: opts.env ?? process.env,
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
+      // Windows 上 npm 全局 bin 是 .cmd/.ps1 shim，spawn 不经 shell 找不到命令名
+      // （Node 对 .cmd 强制要求 shell:true，见 CVE-2024-27980）。
+      // 仅当 bin 是命令名（无路径分隔符，需 shell 查 PATH）时走 shell；
+      // 绝对路径 bin（如 node.exe、测试用脚本）不经 shell，避免空格/转义问题。
+      shell: process.platform === "win32" && !bin.includes("\\") && !bin.includes("/"),
     });
     let stdout = "";
     let stderr = "";

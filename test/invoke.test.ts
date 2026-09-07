@@ -51,4 +51,20 @@ describe("invokeKscc", () => {
     expect(out.timedOut).toBe(true);
     expect(out.exitCode).toBe(null);
   });
+
+  it("命令名 bin（无路径分隔符）在 Windows 经 shell 解析能找到", async () => {
+    // 回归：Windows 上 npm 全局 bin 是 .cmd shim，spawn 不经 shell 找不到命令名。
+    // invokeKscc 对无路径分隔符的 bin 在 win32 走 shell:true。
+    // 用 "node" 命令名（在 PATH 中）+ -e 内联脚本验证 shell 路径工作。
+    const out = await invokeKscc({
+      argv: ["-e", "process.stdout.write('shell-ok')"],
+      cwd: here,
+      timeoutMs: 10000,
+      ksccBin: "node",
+      env: { ...process.env },
+    });
+    expect(out.exitCode).toBe(0);
+    expect(out.timedOut).toBe(false);
+    expect(out.stdout).toContain("shell-ok");
+  });
 });
