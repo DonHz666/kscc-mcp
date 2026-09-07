@@ -28,6 +28,7 @@ export type RunToolArgs = z.infer<typeof runSchema> & {
 };
 
 export interface ToolResult {
+  [key: string]: unknown;
   content: { type: "text"; text: string }[];
   isError?: boolean;
 }
