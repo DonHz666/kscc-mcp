@@ -1,0 +1,1 @@
+{"type":"result","subtype":"success","is_error":true,"api_error_status":"rate_limit","duration_ms":120,"num_turns":0,"result":"Error: rate limited","session_id":null,"total_cost_usd":0,"usage":null,"modelUsage":{},"permission_denials":[]}
