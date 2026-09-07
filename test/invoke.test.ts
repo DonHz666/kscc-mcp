@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { invokeKscc } from "../src/kscc/invoke.js";
+import { invokeKscc, quoteWindowsArg } from "../src/kscc/invoke.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fakeKscc = process.platform === "win32"
@@ -54,8 +54,8 @@ describe("invokeKscc", () => {
 
   it("命令名 bin（无路径分隔符）在 Windows 经 shell 解析能找到", async () => {
     // 回归：Windows 上 npm 全局 bin 是 .cmd shim，spawn 不经 shell 找不到命令名。
-    // invokeKscc 对无路径分隔符的 bin 在 win32 走 shell:true。
-    // 用 "node" 命令名（在 PATH 中）+ -e 内联脚本验证 shell 路径工作。
+    // invokeKscc 对无路径分隔符的 bin 在 win32 走 cmd.exe /c + 手动引号。
+    // 用 "node" 命令名（在 PATH 中）+ -e 内联脚本验证 cmd 路径工作。
     const out = await invokeKscc({
       argv: ["-e", "process.stdout.write('shell-ok')"],
       cwd: here,
@@ -66,5 +66,41 @@ describe("invokeKscc", () => {
     expect(out.exitCode).toBe(0);
     expect(out.timedOut).toBe(false);
     expect(out.stdout).toContain("shell-ok");
+  });
+
+  it("命令名 bin 含空格的 arg 不被截断", async () => {
+    // 回归（真实 bug）：shell:true 曾让 cmd.exe 按空格截断含空格的参数。
+    // 修法改为 cmd.exe /c + 手动引号 + windowsVerbatimArguments。
+    // 用 "node" 命令名 + -e 输出含空格的字符串，验证空格保留。
+    const spaced = "hello world with spaces";
+    const out = await invokeKscc({
+      argv: ["-e", `process.stdout.write(${JSON.stringify(spaced)})`],
+      cwd: here,
+      timeoutMs: 10000,
+      ksccBin: "node",
+      env: { ...process.env },
+    });
+    expect(out.exitCode).toBe(0);
+    expect(out.stdout).toContain(spaced);
+  });
+});
+
+describe("quoteWindowsArg", () => {
+  it("无特殊字符不加引号", () => {
+    expect(quoteWindowsArg("abc")).toBe("abc");
+    expect(quoteWindowsArg("--print")).toBe("--print");
+  });
+  it("含空格加引号", () => {
+    expect(quoteWindowsArg("hello world")).toBe('"hello world"');
+  });
+  it("空字符串变空引号", () => {
+    expect(quoteWindowsArg("")).toBe('""');
+  });
+  it("含双引号转义", () => {
+    expect(quoteWindowsArg('say "hi"')).toBe('"say \\"hi\\""');
+  });
+  it("含特殊字符加引号", () => {
+    expect(quoteWindowsArg("a&b")).toBe('"a&b"');
+    expect(quoteWindowsArg("a|b")).toBe('"a|b"');
   });
 });
